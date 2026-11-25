@@ -1,0 +1,134 @@
+:root {
+  --text: #242424;
+  --muted: #616161;
+  --border: #d1d1d1;
+  --bg: #ffffff;
+  --soft: #f5f5f5;
+  --accent: #0f6e56;
+  --accent-soft: #e1f5ee;
+  --warn-soft: #fff4ce;
+  --warn-text: #6b4c00;
+  --ok-soft: #dff6dd;
+  --ok-text: #0e5c0b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 14px/1.45 "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+[hidden] { display: none !important; }
+
+.layout { display: block; }
+
+/* ---- Preview only: mock Outlook window ---- */
+body.preview-mode { background: #f0f0f0; height: 100vh; overflow: hidden; }
+body.preview-mode .layout {
+  display: grid; height: 100vh;
+  grid-template-columns: 280px minmax(0, 1fr) 340px;
+  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-areas: "ribbon ribbon ribbon" "list reading pane";
+}
+body.preview-mode.pane-closed .layout { grid-template-columns: 280px minmax(0, 1fr) 0; }
+body.preview-mode.pane-closed .pane { display: none; }
+.ribbon {
+  grid-area: ribbon; display: flex; align-items: center; gap: 4px;
+  background: var(--bg); border-bottom: 1px solid var(--border); padding: 6px 12px;
+}
+.preview-tag {
+  background: var(--warn-soft); color: var(--warn-text); font-size: 12px;
+  border-radius: 4px; padding: 2px 8px; margin-right: 16px;
+}
+.rb { font: inherit; font-size: 13px; padding: 4px 10px; border-radius: 4px; color: var(--muted); border: 1px solid transparent; background: none; }
+.rb-sep { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+.rb-addin { display: inline-flex; gap: 6px; align-items: center; color: var(--text); cursor: pointer; }
+.rb-addin:hover { background: var(--soft); }
+.rb-addin[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+
+.mail-list { grid-area: list; background: var(--bg); border-right: 1px solid var(--border); overflow-y: auto; }
+.mail-item {
+  display: block; width: 100%; text-align: left; font: inherit; color: inherit; background: none;
+  border: 0; border-bottom: 1px solid #ececec; border-left: 3px solid transparent;
+  padding: 8px 12px; cursor: pointer;
+}
+.mail-item:hover { background: var(--soft); }
+.mail-item.active { background: #e8f1fb; border-left-color: #0f6cbd; }
+.mail-item .who { display: block; font-weight: 600; font-size: 13px; }
+.mail-item .subj { display: block; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mail-item .scenario { display: block; font-size: 11px; color: var(--warn-text); }
+
+.reading { grid-area: reading; overflow-y: auto; padding: 16px; }
+.email { background: var(--bg); border: 1px solid var(--border); border-radius: 6px; padding: 16px; }
+.email h2 { font-size: 17px; font-weight: 600; margin: 0 0 6px; }
+.email .meta { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.email .badge { display: inline-block; background: var(--soft); border-radius: 4px; padding: 1px 6px; font-size: 12px; }
+
+body.preview-mode .pane { grid-area: pane; border-left: 1px solid var(--border); overflow-y: auto; }
+.host-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-weight: 600; margin: -12px -12px 8px; padding: 10px 12px; border-bottom: 1px solid var(--border);
+}
+.host-head button { border: 0; background: none; font-size: 18px; line-height: 1; cursor: pointer; color: var(--muted); }
+
+@media (max-width: 900px) {
+  body.preview-mode .layout { grid-template-columns: 200px minmax(0, 1fr) 300px; }
+}
+@media (max-width: 760px) {
+  body.preview-mode { height: auto; overflow: auto; }
+  body.preview-mode .layout, body.preview-mode.pane-closed .layout {
+    height: auto; grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto; grid-template-areas: "ribbon" "list" "reading" "pane";
+  }
+  .mail-list { max-height: 220px; border-right: 0; border-bottom: 1px solid var(--border); }
+  .preview-tag { display: none; }
+}
+
+/* ---- The panel (what shows inside Outlook) ---- */
+.pane { background: var(--bg); padding: 12px; }
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
+.tab {
+  border: 0; background: none; padding: 4px 8px; cursor: pointer; color: var(--muted);
+  border-bottom: 2px solid transparent; font: inherit;
+}
+.tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+
+.label { display: block; color: var(--muted); font-size: 12px; margin: 12px 0 4px; }
+input[type=search], select {
+  width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg); color: var(--text);
+}
+.check { display: flex; gap: 6px; align-items: center; margin: 12px 0; font-size: 13px; }
+
+.suggestions, .results { display: flex; flex-direction: column; gap: 6px; }
+.results:empty { display: none; }
+.results { margin-top: 6px; max-height: 220px; overflow-y: auto; }
+.option {
+  text-align: left; font: inherit; color: inherit; background: var(--bg);
+  border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; cursor: pointer;
+}
+.option:hover { border-color: var(--muted); }
+.option.selected { border: 2px solid var(--accent); padding: 7px 9px; background: var(--accent-soft); }
+.option .name { display: block; font-weight: 600; }
+.option .why { display: block; font-size: 12px; color: var(--muted); }
+.option .closed { color: var(--warn-text); }
+.empty { color: var(--muted); font-size: 13px; margin: 0; }
+
+button.primary {
+  width: 100%; font: inherit; font-weight: 600; padding: 8px; border: 0; border-radius: 4px;
+  background: var(--accent); color: #fff; cursor: pointer;
+}
+button.primary:disabled { background: var(--border); color: var(--muted); cursor: default; }
+.help { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+
+.notice { border-radius: 6px; padding: 8px 10px; margin-bottom: 8px; font-size: 13px; }
+.notice.warn { background: var(--warn-soft); color: var(--warn-text); }
+.notice.ok { background: var(--ok-soft); color: var(--ok-text); }
+
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chips:empty { display: none; }
+.chip { background: var(--accent-soft); color: #085041; border-radius: 4px; padding: 2px 6px; font-size: 12px; }
+.chip .k { font-weight: 600; }
+.search-results { list-style: none; margin: 8px 0 0; padding: 0; }
+.search-results li { border-top: 1px solid var(--border); padding: 8px 0; }
+.search-results .subject { font-weight: 600; display: block; }
+.search-results .meta { color: var(--muted); font-size: 12px; display: block; }
+.search-results .snippet { font-size: 13px; display: block; margin-top: 2px; }

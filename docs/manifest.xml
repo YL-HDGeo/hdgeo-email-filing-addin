@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Outlook add-in manifest for HD Geo email filing.
+  Before deploying, replace every https://yl-hdgeo.github.io/hdgeo-email-filing-addin with the real hosting
+  address (for example the GitHub Pages or Azure Static Web Apps URL).
+-->
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:mailappor="http://schemas.microsoft.com/office/mailappversionoverrides/1.0"
+           xsi:type="MailApp">
+  <Id>fe083cd3-00c3-4b32-a1b7-b5a4528a1ea4</Id>
+  <Version>0.1.0.0</Version>
+  <ProviderName>HD Geo</ProviderName>
+  <DefaultLocale>en-NZ</DefaultLocale>
+  <DisplayName DefaultValue="HD Geo filing"/>
+  <Description DefaultValue="File project emails to the right HD Geo project site, and search filed emails."/>
+  <IconUrl DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-128.png"/>
+  <SupportUrl DefaultValue="https://hdhq.sharepoint.com"/>
+  <AppDomains>
+    <AppDomain>https://hdhq.sharepoint.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Mailbox"/>
+  </Hosts>
+  <Requirements>
+    <Sets>
+      <Set Name="Mailbox" MinVersion="1.5"/>
+    </Sets>
+  </Requirements>
+  <FormSettings>
+    <Form xsi:type="ItemRead">
+      <DesktopSettings>
+        <SourceLocation DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/taskpane.html"/>
+        <RequestedHeight>250</RequestedHeight>
+      </DesktopSettings>
+    </Form>
+  </FormSettings>
+  <Permissions>ReadItem</Permissions>
+  <Rule xsi:type="RuleCollection" Mode="Or">
+    <Rule xsi:type="ItemIs" ItemType="Message" FormType="Read"/>
+  </Rule>
+  <DisableEntityHighlighting>false</DisableEntityHighlighting>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <VersionOverrides xmlns="http://schemas.microsoft.com/office/mailappversionoverrides/1.1" xsi:type="VersionOverridesV1_1">
+      <Requirements>
+        <bt:Sets DefaultMinVersion="1.5">
+          <bt:Set Name="Mailbox"/>
+        </bt:Sets>
+      </Requirements>
+      <Hosts>
+        <Host xsi:type="MailHost">
+          <DesktopFormFactor>
+            <ExtensionPoint xsi:type="MessageReadCommandSurface">
+              <OfficeTab id="TabDefault">
+                <Group id="hdgeoFilingGroup">
+                  <Label resid="GroupLabel"/>
+                  <Control xsi:type="Button" id="hdgeoFileButton">
+                    <Label resid="ButtonLabel"/>
+                    <Supertip>
+                      <Title resid="ButtonLabel"/>
+                      <Description resid="ButtonTip"/>
+                    </Supertip>
+                    <Icon>
+                      <bt:Image size="16" resid="Icon16"/>
+                      <bt:Image size="32" resid="Icon32"/>
+                      <bt:Image size="80" resid="Icon80"/>
+                    </Icon>
+                    <Action xsi:type="ShowTaskpane">
+                      <SourceLocation resid="TaskpaneUrl"/>
+                      <SupportsPinning>true</SupportsPinning>
+                    </Action>
+                  </Control>
+                </Group>
+              </OfficeTab>
+            </ExtensionPoint>
+          </DesktopFormFactor>
+          <MobileFormFactor>
+            <ExtensionPoint xsi:type="MobileMessageReadCommandSurface">
+              <Group id="hdgeoMobileGroup">
+                <Label resid="GroupLabel"/>
+                <Control xsi:type="MobileButton" id="hdgeoMobileButton">
+                  <Label resid="ButtonLabel"/>
+                  <Icon xsi:type="bt:MobileIconList">
+                    <bt:Image size="25" scale="1" resid="Icon32"/>
+                    <bt:Image size="25" scale="2" resid="Icon64"/>
+                    <bt:Image size="25" scale="3" resid="Icon80"/>
+                    <bt:Image size="32" scale="1" resid="Icon32"/>
+                    <bt:Image size="32" scale="2" resid="Icon64"/>
+                    <bt:Image size="32" scale="3" resid="Icon128"/>
+                    <bt:Image size="48" scale="1" resid="Icon64"/>
+                    <bt:Image size="48" scale="2" resid="Icon128"/>
+                    <bt:Image size="48" scale="3" resid="Icon128"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <SourceLocation resid="TaskpaneUrl"/>
+                  </Action>
+                </Control>
+              </Group>
+            </ExtensionPoint>
+          </MobileFormFactor>
+        </Host>
+      </Hosts>
+      <Resources>
+        <bt:Images>
+          <bt:Image id="Icon16" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-16.png"/>
+          <bt:Image id="Icon32" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-32.png"/>
+          <bt:Image id="Icon64" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-64.png"/>
+          <bt:Image id="Icon80" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-80.png"/>
+          <bt:Image id="Icon128" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/assets/icon-128.png"/>
+        </bt:Images>
+        <bt:Urls>
+          <bt:Url id="TaskpaneUrl" DefaultValue="https://yl-hdgeo.github.io/hdgeo-email-filing-addin/taskpane.html"/>
+        </bt:Urls>
+        <bt:ShortStrings>
+          <bt:String id="GroupLabel" DefaultValue="HD Geo"/>
+          <bt:String id="ButtonLabel" DefaultValue="File to project"/>
+        </bt:ShortStrings>
+        <bt:LongStrings>
+          <bt:String id="ButtonTip" DefaultValue="File this email to an HD Geo project site, or search filed emails."/>
+        </bt:LongStrings>
+      </Resources>
+    </VersionOverrides>
+  </VersionOverrides>
+</OfficeApp>

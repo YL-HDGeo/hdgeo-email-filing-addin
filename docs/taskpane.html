@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en-NZ">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HD Geo filing</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <link rel="stylesheet" href="taskpane.css" />
+</head>
+<body>
+  <div class="layout">
+    <!-- Preview only (normal browser): a mock Outlook window around the panel.
+         Inside real Outlook none of this shows, only the panel. -->
+    <div id="ribbon" class="ribbon" hidden>
+      <span class="preview-tag">Preview: sample data, mock Outlook window</span>
+      <span class="rb">Reply</span><span class="rb">Reply all</span><span class="rb">Forward</span>
+      <span class="rb-sep"></span>
+      <button type="button" id="ribbon-file" class="rb rb-addin" aria-pressed="true">
+        <img src="assets/icon-32.png" alt="" width="16" height="16" /> File to project
+      </button>
+    </div>
+    <aside id="mail-list" class="mail-list" hidden aria-label="Inbox"></aside>
+    <section id="reading" class="reading" hidden>
+      <article class="email" id="sample-email"></article>
+    </section>
+
+    <main class="pane" id="pane">
+      <div id="host-head" class="host-head" hidden>
+        <span>HD Geo filing</span>
+        <button type="button" id="host-close" aria-label="Close">×</button>
+      </div>
+      <nav class="tabs" role="tablist">
+        <button role="tab" id="tab-file" class="tab active" aria-selected="true">File</button>
+        <button role="tab" id="tab-search" class="tab" aria-selected="false">Search</button>
+      </nav>
+
+      <section id="view-file">
+        <div id="file-notice"></div>
+
+        <div id="file-form">
+          <p class="label">Suggested project</p>
+          <div id="suggestions" class="suggestions"></div>
+
+          <label class="label" for="project-search">Or search all projects</label>
+          <input id="project-search" type="search" placeholder="HD number, job name or client" autocomplete="off" />
+          <div id="project-results" class="results"></div>
+
+          <label class="label" for="folder-select">Folder</label>
+          <select id="folder-select" disabled></select>
+
+          <label class="check"><input type="checkbox" id="include-attachments" checked /> Include attachments</label>
+
+          <button id="file-btn" class="primary" disabled>File email</button>
+          <p id="file-help" class="help"></p>
+        </div>
+      </section>
+
+      <section id="view-search" hidden>
+        <label class="label" for="keyword-input">Describe the email you're looking for</label>
+        <input id="keyword-input" type="search" placeholder="Sarah from Clientco about retaining wall levels last month" />
+        <div id="search-chips" class="chips"></div>
+
+        <p id="search-count" class="help"></p>
+        <ul id="search-results" class="search-results"></ul>
+      </section>
+    </main>
+  </div>
+
+  <script src="matching.js"></script>
+  <script src="sample-data.js"></script>
+  <script src="taskpane.js"></script>
+</body>
+</html>
