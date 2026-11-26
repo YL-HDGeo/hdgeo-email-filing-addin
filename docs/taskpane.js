@@ -1,8 +1,9 @@
 // HD Geo email filing panel.
 // Runs in two modes:
 //  - Preview: a normal browser, using sample emails and projects.
-//  - Outlook: reads the open email from Outlook. Projects and saving still use
-//    sample data until the app registration (Microsoft Graph access) is set up.
+//  - Outlook: reads the open email from Outlook and files it through the
+//    "Email filing - File email" Power Automate flow. The flow link is saved
+//    in the user's Outlook roaming settings (never in this code).
 
 (function () {
   const data = window.SampleData;
@@ -25,6 +26,45 @@
     return `${d}/${m}/${y}`;
   };
   const projectByHd = hd => state.projects.find(p => p.hdNumber === hd);
+  // Outlook mode has no project list yet: an HD number stands in for the project,
+  // and the flow checks it against the Project Register.
+  const stubProject = hd => ({ hdNumber: hd, jobName: '', client: '', status: '', siteUrl: '', folders: [] });
+  const addStub = hd => { if (!projectByHd(hd)) state.projects.push(stubProject(hd)); };
+
+  // ---------- Settings (flow link) ----------
+
+  const SETTING_KEY = 'fileFlowUrl';
+  function getFlowUrl() {
+    try {
+      if (state.mode === 'outlook') return Office.context.roamingSettings.get(SETTING_KEY) || '';
+      return localStorage.getItem(SETTING_KEY) || '';
+    } catch (e) { return ''; }
+  }
+  function saveFlowUrl(url, done) {
+    if (state.mode === 'outlook') {
+      if (url) Office.context.roamingSettings.set(SETTING_KEY, url);
+      else Office.context.roamingSettings.remove(SETTING_KEY);
+      Office.context.roamingSettings.saveAsync(r => done(r.status === Office.AsyncResultStatus.Succeeded));
+    } else {
+      try { url ? localStorage.setItem(SETTING_KEY, url) : localStorage.removeItem(SETTING_KEY); done(true); }
+      catch (e) { done(false); }
+    }
+  }
+  function wireSettings() {
+    $('save-settings').addEventListener('click', () => {
+      const url = $('flow-url').value.trim();
+      if (url && !/^https:\/\/[^/]+\.(powerplatform\.com|logic\.azure\.com)(:\d+)?\//i.test(url)) {
+        $('settings-help').textContent = 'That doesn\'t look like a Power Automate flow link. Copy the HTTP URL from the flow\'s trigger.';
+        return;
+      }
+      saveFlowUrl(url, ok => {
+        $('settings-help').textContent = ok
+          ? (url ? 'Saved. You can now file emails.' : 'Link removed.')
+          : 'Could not save the setting. Try again.';
+        if (state.result) renderFileView();
+      });
+    });
+  }
 
   // ---------- Start-up ----------
 
@@ -33,8 +73,14 @@
     wireTabs();
     wireFileView();
     wireSearchView();
+    wireSettings();
 
     if (inOutlook) {
+      state.projects = [];
+      state.filedLog = [];
+      $('tab-settings').hidden = false;
+      $('folder-block').hidden = true;
+      $('flow-url').value = getFlowUrl();
       loadOutlookEmail();
       // Keep working when the pane is pinned and the person opens another email.
       Office.context.mailbox.addHandlerAsync(Office.EventType.ItemChanged, loadOutlookEmail);
@@ -103,6 +149,7 @@
   function showEmail(email) {
     state.email = email;
     if (state.mode === 'preview') renderSampleEmail(email);
+    else M.extractHdNumbers(email.subject).forEach(addStub);
     state.result = M.suggestProjects(email, state.projects, state.filedLog);
     state.selectedHd = state.result.autoSelect;
     $('project-search').value = '';
@@ -130,9 +177,11 @@
     const closed = /completed|cancelled|closed/i.test(project.status)
       ? ` · <span class="closed">${esc(project.status)}</span>` : '';
     const sel = project.hdNumber === state.selectedHd ? ' selected' : '';
+    const name = project.jobName ? `${project.hdNumber} – ${project.jobName}` : project.hdNumber;
+    const sub = [project.client, why].filter(Boolean).join(' · ');
     return `<button type="button" class="option${sel}" data-hd="${esc(project.hdNumber)}">
-      <span class="name">${esc(project.hdNumber)} – ${esc(project.jobName)}</span>
-      <span class="why">${esc(project.client)}${why ? ' · ' + esc(why) : ''}${closed}</span>
+      <span class="name">${esc(name)}</span>
+      <span class="why">${esc(sub)}${closed}</span>
     </button>`;
   }
 
@@ -185,6 +234,18 @@
     const btn = $('file-btn');
     btn.disabled = !project;
     btn.textContent = project ? `File to ${project.hdNumber}` : 'File email';
+    if (state.mode === 'outlook') {
+      const hasLink = !!getFlowUrl();
+      btn.disabled = !project || !hasLink;
+      $('file-help').textContent = !hasLink
+        ? 'Add the filing flow link in Settings first.'
+        : project
+          ? (/-\d+$/.test(project.hdNumber)
+            ? `Saves to the ${project.hdNumber} variation folder › 01 Emails on the project site (or Emails if there's no variation folder).`
+            : `Saves to the ${project.hdNumber} project site › Emails.`)
+          : '';
+      return;
+    }
     $('file-help').textContent = project
       ? `Saves to ${project.siteUrl.replace('https://', '')} › ${folderSelect.value}`
       : '';
@@ -194,6 +255,20 @@
     const q = $('project-search').value.trim().toLowerCase();
     const out = $('project-results');
     if (q.length < 2) { out.innerHTML = ''; return; }
+    if (state.mode === 'outlook') {
+      // No project list in Outlook yet: accept a typed HD number.
+      const hds = M.extractHdNumbers(q.replace(/^(\d)/, 'HD$1'));
+      out.innerHTML = hds.length
+        ? hds.map(hd => optionHtml(stubProject(hd), 'Typed HD number')).join('')
+        : '<p class="empty">Type the HD number, e.g. HD4156 or HD4156-1.</p>';
+      out.querySelectorAll('.option').forEach(btn => btn.addEventListener('click', () => {
+        addStub(btn.dataset.hd);
+        state.selectedHd = btn.dataset.hd;
+        renderFileView();
+        renderProjectSearch();
+      }));
+      return;
+    }
     const matches = state.projects.filter(p =>
       [p.hdNumber, p.jobName, p.client].join(' ').toLowerCase().includes(q)).slice(0, 20);
     out.innerHTML = matches.length
@@ -209,8 +284,7 @@
     const e = state.email;
 
     if (state.mode === 'outlook') {
-      // Saving needs Microsoft Graph access, which comes with the app registration.
-      $('file-help').textContent = 'Saving to SharePoint switches on once the app registration is set up. Nothing was saved.';
+      fileFromOutlook(project.hdNumber);
       return;
     }
 
@@ -226,11 +300,71 @@
     runSearch();
   }
 
+  // Outlook: get the whole email (with attachments) as an .eml file and send it to the flow.
+  function fileFromOutlook(hd) {
+    const item = Office.context.mailbox.item;
+    const btn = $('file-btn');
+    const say = (cls, msg) => { $('file-notice').innerHTML = `<div class="notice ${cls}">${msg}</div>`; };
+    const flowUrl = getFlowUrl();
+    if (!flowUrl) { say('warn', 'Add the filing flow link in Settings first.'); return; }
+    if (!Office.context.requirements.isSetSupported('Mailbox', '1.14') || !item.getAsFileAsync) {
+      say('err', 'This version of Outlook can\'t hand the email over as a file. Use new Outlook or Outlook on the web.');
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = 'Filing…';
+    const email = state.email;
+    item.getAsFileAsync(res => {
+      if (res.status !== Office.AsyncResultStatus.Succeeded) {
+        say('err', 'Could not read the email from Outlook: ' + esc(res.error && res.error.message));
+        renderButtonOnly(hd);
+        return;
+      }
+      fetch(flowUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hdNumber: hd,
+          subject: email.subject,
+          receivedDateTime: email.date,
+          from: email.from,
+          conversationId: email.conversationId,
+          filedBy: (Office.context.mailbox.userProfile || {}).emailAddress || '',
+          emlBase64: res.value,
+        }),
+      })
+        .then(r => r.text().then(text => ({ ok: r.ok, status: r.status, text })))
+        .then(({ ok, status, text }) => {
+          if (ok) {
+            let info = {};
+            try { info = JSON.parse(text); } catch (e) { /* plain text reply */ }
+            const where = (info.Path || '').replace(/^\/Shared Documents\//, '').replace(/\/[^/]*$/, '').replace(/\//g, ' › ');
+            say('ok', `Filed to ${esc(hd)}${where ? ' › ' + esc(where) : ''}.<br><small>${esc(info.Name || '')}</small>`);
+            state.filedLog.push({
+              messageId: email.messageId, conversationId: email.conversationId, hdNumber: hd,
+              folder: where || 'Emails', subject: email.subject, from: email.from, fromName: email.fromName,
+              client: '', date: (email.date || '').slice(0, 10), preview: '',
+            });
+          } else {
+            say('err', esc(text || `Not filed (error ${status}).`));
+          }
+        })
+        .catch(() => say('err', 'Could not reach the filing flow. Check your connection and the link in Settings.'))
+        .finally(() => renderButtonOnly(hd));
+    });
+  }
+
+  function renderButtonOnly(hd) {
+    const btn = $('file-btn');
+    btn.disabled = false;
+    btn.textContent = `File to ${hd}`;
+  }
+
   // ---------- Search view ----------
 
   function wireTabs() {
     const show = which => {
-      ['file', 'search'].forEach(v => {
+      ['file', 'search', 'settings'].forEach(v => {
         $('view-' + v).hidden = v !== which;
         $('tab-' + v).classList.toggle('active', v === which);
         $('tab-' + v).setAttribute('aria-selected', v === which);
@@ -239,6 +373,7 @@
     };
     $('tab-file').addEventListener('click', () => show('file'));
     $('tab-search').addEventListener('click', () => show('search'));
+    $('tab-settings').addEventListener('click', () => show('settings'));
   }
 
   function wireSearchView() {

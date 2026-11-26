@@ -19,10 +19,13 @@ Run a local web server on `docs` and open `taskpane.html` in a browser. Choose s
 
 ## Status
 - [x] Panel, matching rules and search, previewed with sample data
-- [ ] **Andrew:** Entra app registration and admin consent (Microsoft Graph: read mail, read/write SharePoint sites)
-- [ ] Connect to the real Project Register and save emails to SharePoint through Microsoft Graph
+- [x] Filing works without Andrew (27/11/2026): the add-in sends the open email (`getAsFileAsync`, Mailbox 1.14) to the Power Automate flow "Email filing - File email" (HDGeoAutomations). The flow finds the site in the Project Register and saves `yyyyMMddHHmmss - subject.eml` to `/Shared Documents/Emails`, or to `<HD-n> - …/01 Emails` for dash jobs. The flow link is pasted once in the panel's **Settings** and stored in the user's Outlook settings, never in this repo.
+- [ ] HDGeoAutomations on the 382 private HD teams (Andrew, at rollout)
+- [ ] Real project list in the panel (names, clients) instead of HD numbers only
+- [ ] **Andrew (later, for rollout):** Entra app registration, if we move from the flow link to signed-in Microsoft Graph calls
 - [ ] "Project Email Register" list for thread matching and search
 - [ ] Client contact emails from Scoro for sender matching
 - [ ] "File this?" prompt on send
 - [x] Copilot test (25/11/2026): Copilot reads .eml, .msg and PDF filed to SharePoint, so no PDF copy is needed (see `copilot-test/TEST-STEPS.md`)
-- [ ] Host on HTTPS, replace `https://localhost:3000` in `manifest.xml`, test in your own Outlook, pilot, deploy
+- [x] Hosted on GitHub Pages (`https://yl-hdgeo.github.io/hdgeo-email-filing-addin/`)
+- [ ] Test in Yiling's Outlook, pilot, deploy

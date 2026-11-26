@@ -32,6 +32,7 @@
       <nav class="tabs" role="tablist">
         <button role="tab" id="tab-file" class="tab active" aria-selected="true">File</button>
         <button role="tab" id="tab-search" class="tab" aria-selected="false">Search</button>
+        <button role="tab" id="tab-settings" class="tab tab-right" aria-selected="false" hidden>Settings</button>
       </nav>
 
       <section id="view-file">
@@ -45,10 +46,12 @@
           <input id="project-search" type="search" placeholder="HD number, job name or client" autocomplete="off" />
           <div id="project-results" class="results"></div>
 
-          <label class="label" for="folder-select">Folder</label>
-          <select id="folder-select" disabled></select>
+          <div id="folder-block">
+            <label class="label" for="folder-select">Folder</label>
+            <select id="folder-select" disabled></select>
 
-          <label class="check"><input type="checkbox" id="include-attachments" checked /> Include attachments</label>
+            <label class="check"><input type="checkbox" id="include-attachments" checked /> Include attachments</label>
+          </div>
 
           <button id="file-btn" class="primary" disabled>File email</button>
           <p id="file-help" class="help"></p>
@@ -62,6 +65,13 @@
 
         <p id="search-count" class="help"></p>
         <ul id="search-results" class="search-results"></ul>
+      </section>
+
+      <section id="view-settings" hidden>
+        <label class="label" for="flow-url">Filing flow link</label>
+        <input id="flow-url" type="password" placeholder="Paste the HTTP URL of the 'Email filing - File email' flow" autocomplete="off" />
+        <button id="save-settings" class="primary" type="button">Save</button>
+        <p id="settings-help" class="help">Saved in your own Outlook settings only. Treat the link like a password: anyone who has it can file emails to project sites.</p>
       </section>
     </main>
   </div>

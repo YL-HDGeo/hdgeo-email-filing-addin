@@ -90,6 +90,12 @@ body.preview-mode .pane { grid-area: pane; border-left: 1px solid var(--border);
   border-bottom: 2px solid transparent; font: inherit;
 }
 .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+.tab-right { margin-left: auto; }
+input[type=password] {
+  width: 100%; font: inherit; padding: 6px 8px; border: 1px solid var(--border);
+  border-radius: 4px; background: var(--bg); color: var(--text); margin-bottom: 8px;
+}
+.notice.err { background: #fde7e9; color: #8a1c24; }
 
 .label { display: block; color: var(--muted); font-size: 12px; margin: 12px 0 4px; }
 input[type=search], select {
@@ -114,7 +120,7 @@ input[type=search], select {
 
 button.primary {
   width: 100%; font: inherit; font-weight: 600; padding: 8px; border: 0; border-radius: 4px;
-  background: var(--accent); color: #fff; cursor: pointer;
+  background: var(--accent); color: #fff; cursor: pointer; margin-top: 12px;
 }
 button.primary:disabled { background: var(--border); color: var(--muted); cursor: default; }
 .help { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
