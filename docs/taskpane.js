@@ -421,6 +421,28 @@
     }
   }
 
+  // Turns the SharePoint search reply (from the search flow) into simple rows.
+  // File names look like "20260528084726 - Re_ HD3884 - subject": the date comes from the front.
+  function searchRows(search) {
+    const table = search && search.PrimaryQueryResult && search.PrimaryQueryResult.RelevantResults
+      && search.PrimaryQueryResult.RelevantResults.Table;
+    const rows = (table && table.Rows) || [];
+    return rows.map(r => {
+      const o = {};
+      (r.Cells || []).forEach(c => { o[c.Key] = c.Value; });
+      const title = String(o.Title || '');
+      const m = title.match(/^(\d{4})(\d{2})(\d{2})\d{6} - (.*)$/);
+      const clean = s => String(s || '').replace(/<\/?c0>/g, '').replace(/<ddd\/>/g, '…').replace(/\s+/g, ' ').trim();
+      return {
+        title: (m ? m[4] : title).replace(/_ /g, ': ').replace(/^RE: /i, 'RE: '),
+        url: o.Path || '',
+        site: o.SiteTitle || '',
+        date: m ? `${m[1]}-${m[2]}-${m[3]}` : (o.Write || ''),
+        summary: clean(o.HitHighlightedSummary).slice(0, 220),
+      };
+    }).filter(x => x.url);
+  }
+
   function runAsk(text) {
     text = (text || '').trim();
     const status = $('ask-status');
@@ -461,7 +483,7 @@
         if (!ok) { status.textContent = t || 'Search failed.'; return; }
         let res = {};
         try { res = JSON.parse(t); } catch (e) { status.textContent = 'Search reply could not be read.'; return; }
-        const rows = res.results || [];
+        const rows = res.results || searchRows(res.search);
         if (res.query) chips.innerHTML = `<span class="chip"><span class="k">Searched</span> ${esc(res.query)}</span>`;
         status.textContent = rows.length ? `${rows.length} filed email${rows.length === 1 ? '' : 's'} found` : 'No filed emails found. Try fewer or different words.';
         list.innerHTML = rows.map((x, i) => `<li>
