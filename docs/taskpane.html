@@ -29,49 +29,45 @@
         <span>HD Geo filing</span>
         <button type="button" id="host-close" aria-label="Close">×</button>
       </div>
-      <nav class="tabs" role="tablist">
-        <button role="tab" id="tab-file" class="tab active" aria-selected="true">File</button>
-        <button role="tab" id="tab-search" class="tab" aria-selected="false">Search</button>
-        <button role="tab" id="tab-settings" class="tab tab-right" aria-selected="false" hidden>Settings</button>
-      </nav>
 
-      <section id="view-file">
-        <div id="file-notice"></div>
+      <header class="brand">
+        <span class="brand-tri" aria-hidden="true"></span>
+        <div class="brand-text">
+          <span class="brand-title">Email filing</span>
+          <span class="brand-sub">HD Geo project sites</span>
+        </div>
+        <button type="button" id="open-settings" class="icon-btn" aria-label="Settings" title="Settings">
+          <svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M11.3 1.5l.4 2.1c.5.2 1 .5 1.4.8l2-.8 1.3 2.3-1.6 1.4c.1.5.1 1 0 1.5l1.6 1.4-1.3 2.3-2-.8c-.4.3-.9.6-1.4.8l-.4 2.1H8.7l-.4-2.1c-.5-.2-1-.5-1.4-.8l-2 .8-1.3-2.3 1.6-1.4a4.6 4.6 0 010-1.5L3.6 5.9l1.3-2.3 2 .8c.4-.3.9-.6 1.4-.8l.4-2.1h2.6zM10 7a3 3 0 100 6 3 3 0 000-6z"/></svg>
+        </button>
+      </header>
 
-        <div id="file-form">
-          <p class="label">Suggested project</p>
-          <div id="suggestions" class="suggestions"></div>
+      <section id="view-main">
+        <div id="file-card" class="card" aria-live="polite"></div>
 
-          <label class="label" for="project-search">Or search all projects</label>
-          <input id="project-search" type="search" placeholder="HD number, job name or client" autocomplete="off" />
-          <div id="project-results" class="results"></div>
-
-          <div id="folder-block">
-            <label class="label" for="folder-select">Folder</label>
-            <select id="folder-select" disabled></select>
-
-            <label class="check"><input type="checkbox" id="include-attachments" checked /> Include attachments</label>
-          </div>
-
-          <button id="file-btn" class="primary" disabled>File email</button>
-          <p id="file-help" class="help"></p>
+        <div class="card ask">
+          <label class="card-title" for="ask-input">Ask about filed emails</label>
+          <form id="ask-form" class="ask-row" autocomplete="off">
+            <input id="ask-input" type="search" placeholder="e.g. tom waikato bilders retaning wall last month" />
+            <button type="submit" class="btn-ask">Ask</button>
+          </form>
+          <div id="ask-chips" class="chips"></div>
+          <p id="ask-status" class="help"></p>
+          <ul id="ask-results" class="results-list"></ul>
         </div>
       </section>
 
-      <section id="view-search" hidden>
-        <label class="label" for="keyword-input">Describe the email you're looking for</label>
-        <input id="keyword-input" type="search" placeholder="Sarah from Clientco about retaining wall levels last month" />
-        <div id="search-chips" class="chips"></div>
-
-        <p id="search-count" class="help"></p>
-        <ul id="search-results" class="search-results"></ul>
-      </section>
-
       <section id="view-settings" hidden>
-        <label class="label" for="flow-url">Filing flow link</label>
-        <input id="flow-url" type="password" placeholder="Paste the HTTP URL of the 'Email filing - File email' flow" autocomplete="off" />
-        <button id="save-settings" class="primary" type="button">Save</button>
-        <p id="settings-help" class="help">Saved in your own Outlook settings only. Treat the link like a password: anyone who has it can file emails to project sites.</p>
+        <button type="button" id="close-settings" class="link-btn">‹ Back</button>
+        <div class="card">
+          <p class="card-title">Settings</p>
+          <label class="label" for="flow-url">Filing flow link</label>
+          <input id="flow-url" type="password" placeholder="HTTP URL of 'Email filing - File email'" autocomplete="off" />
+          <label class="label" for="search-url">Search flow link</label>
+          <input id="search-url" type="password" placeholder="HTTP URL of 'Email filing - Search'" autocomplete="off" />
+          <label class="check"><input type="checkbox" id="auto-file" checked /> File automatically when the subject has one HD number</label>
+          <button id="save-settings" class="btn-primary" type="button">Save</button>
+          <p id="settings-help" class="help">Saved in your own Outlook settings only. Treat these links like passwords: anyone who has them can file or search project emails.</p>
+        </div>
       </section>
     </main>
   </div>
