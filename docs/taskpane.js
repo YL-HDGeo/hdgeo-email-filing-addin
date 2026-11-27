@@ -30,6 +30,7 @@
     card: { kind: 'idle' },
     chooserOpen: false,
     token: 0,               // bumps on every new email, so late replies are ignored
+    askToken: 0,            // bumps on every search, so late replies are ignored
     props: null,            // Outlook custom properties of the open email
   };
 
@@ -616,6 +617,7 @@
       const clean = s => String(s || '').replace(/<\/?c0>/g, '').replace(/<ddd\/>/g, '…').replace(/\s+/g, ' ').trim();
       return {
         title: (m ? m[4] : title).replace(/_ /g, ': ').replace(/^RE: /i, 'RE: '),
+        path: o.Path || '',
         url: o.Path ? viewerUrl(o.Path) : '',
         site: o.SiteTitle || '',
         date: m ? `${m[1]}-${m[2]}-${m[3]}` : (o.Write || ''),
@@ -650,10 +652,14 @@
     if (!hasSearchLink()) { status.textContent = 'Add the search flow link in Settings (⚙ at the top) first.'; return; }
 
     const btn = document.querySelector('.btn-ask');
+    const answerBox = $('ask-answer');
     btn.disabled = true;
-    status.textContent = 'Searching filed emails…';
+    status.innerHTML = '<span class="spinner dark"></span> Searching filed emails and reading the best matches…';
     list.innerHTML = '';
     chips.innerHTML = '';
+    answerBox.hidden = true;
+    const token = ++state.askToken;
+
     fetch(searchUrl(), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -661,19 +667,61 @@
     })
       .then(r => r.text().then(t => ({ ok: r.ok, t })))
       .then(({ ok, t }) => {
-        if (!ok) { status.textContent = t || 'Search failed.'; return; }
+        if (!ok) throw new Error(t || 'Search failed.');
         let res = {};
-        try { res = JSON.parse(t); } catch (e) { status.textContent = 'Search reply could not be read.'; return; }
+        try { res = JSON.parse(t); } catch (e) { throw new Error('Search reply could not be read.'); }
         const rows = res.results || searchRows(res.search);
-        if (res.query) chips.innerHTML = `<span class="chip"><span class="k">Searched</span> ${esc(res.query)}</span>`;
-        status.textContent = rows.length ? `${rows.length} filed email${rows.length === 1 ? '' : 's'} found` : 'No filed emails found. Try fewer or different words.';
-        list.innerHTML = rows.map((x, i) => `<li>
-          <a href="${esc(x.url)}" data-i="${i}">${esc(x.title)}</a>
+        if (rows.length) return { rows, ai: parseAnswer(res.answer) };
+        // The AI's search found nothing (or was malformed): retry with a plain loose search.
+        return searchExact(looseKql(text)).then(raw => ({
+          rows: searchRows({ PrimaryQueryResult: { RelevantResults: { Table: { Rows: raw.map(o => ({ Cells: Object.entries(o).map(([Key, Value]) => ({ Key, Value })) })) } } } }),
+          ai: null, loose: true,
+        }));
+      })
+      .then(({ rows, ai, loose }) => {
+        if (token !== state.askToken) return;
+        // Put the AI's picks first, in its order.
+        const picks = ((ai && ai.best) || []).map(p => rows.find(r => r.path === p)).filter(Boolean);
+        const rest = rows.filter(r => !picks.includes(r)).slice(0, picks.length ? 8 : 15);
+        if (ai && ai.answer) {
+          answerBox.innerHTML = `<span class="answer-label">Answer</span>${esc(ai.answer)}`;
+          answerBox.hidden = false;
+        }
+        status.textContent = !rows.length ? 'No filed emails found. Try fewer or different words, a project name or HD number.'
+          : loose ? 'Showing looser matches.' : '';
+        const item = (x, best) => `<li${best ? ' class="best"' : ''}>
+          ${best ? '<span class="best-tag">Best match</span>' : ''}
+          <a href="${esc(x.url)}">${esc(x.title)}</a>
           <span class="meta">${esc(x.site || '')}${x.date ? ' · ' + nzDate(x.date) : ''}</span>
-          ${x.summary ? `<span class="snippet">${esc(x.summary)}</span>` : ''}</li>`).join('');
+          ${x.summary ? `<span class="snippet">${esc(x.summary)}</span>` : ''}</li>`;
+        list.innerHTML = picks.map(x => item(x, true)).join('')
+          + (picks.length && rest.length ? '<li class="more-head">Other matches</li>' : '')
+          + rest.map(x => item(x, false)).join('');
         list.querySelectorAll('a').forEach(a => a.addEventListener('click', ev => { ev.preventDefault(); openLink(a.getAttribute('href')); }));
       })
-      .catch(() => { status.textContent = 'Could not reach the search flow. Check your connection and the link in Settings.'; })
+      .catch(err => {
+        if (token !== state.askToken) return;
+        status.textContent = (err && err.message && !/fetch/i.test(err.message)) ? err.message
+          : 'Could not reach the search flow. Check your connection and the link in Settings.';
+      })
       .finally(() => { btn.disabled = false; });
+  }
+
+  // The answer step replies with JSON text: {"answer": "...", "best": [paths]}.
+  function parseAnswer(text) {
+    if (!text) return null;
+    const s = String(text).replace(/^```(json)?/i, '').replace(/```\s*$/, '').trim();
+    try {
+      const o = JSON.parse(s.slice(s.indexOf('{'), s.lastIndexOf('}') + 1));
+      return { answer: String(o.answer || ''), best: Array.isArray(o.best) ? o.best.map(String) : [] };
+    } catch (e) { return { answer: s, best: [] }; }
+  }
+
+  // Loose fallback: any of the words, start-of-word matching, filed emails only.
+  function looseKql(text) {
+    const stop = /^(the|and|for|from|with|about|email|emails|find|show|me|in|on|of|to|a|an|most|recent|latest|last|newest)$/i;
+    const words = text.split(/\s+/).map(w => w.replace(/[^\w-]/g, '')).filter(w => w.length > 2 && !stop.test(w)).slice(0, 6);
+    const any = words.map(w => `(${w}* OR SiteTitle:${w}*)`).join(' OR ');
+    return `(${any || '*'}) (FileExtension:eml OR FileExtension:msg)`;
   }
 })();
