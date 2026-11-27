@@ -8,7 +8,12 @@
 // Filing rules:
 //  - Meeting invites are never filed.
 //  - Subject with exactly one HD number: filed automatically (if auto-file is on).
-//  - Otherwise (client emails, several HD numbers): suggest, and the person clicks.
+//  - No HD number: look for a clue in filed emails (same thread, same client contact,
+//    recent ones count most). One clear project -> "File to HDxxxx?" Yes/No.
+//    Otherwise the likely projects are listed, or the person types an HD number or
+//    searches project sites by job name, address or client.
+//  - Several HD numbers: the person picks.
+//  - Search results open in SharePoint's file viewer, not as a download.
 //  - A filed email is marked on the email itself, so opening it again doesn't re-file.
 
 (function () {
@@ -39,8 +44,14 @@
   const projectByHd = hd => state.projects.find(p => p.hdNumber === hd);
   // Outlook has no project list yet: an HD number stands in for the project and
   // the flow checks it against the Project Register.
-  const stubProject = hd => ({ hdNumber: hd, jobName: '', client: '', status: '', siteUrl: '', folders: [] });
-  const addStub = hd => { if (!projectByHd(hd)) state.projects.push(stubProject(hd)); };
+  const stubProject = (hd, name) => ({ hdNumber: hd, jobName: name || '', client: '', status: '', siteUrl: '', folders: [] });
+  const addStub = (hd, name) => {
+    const p = projectByHd(hd);
+    if (!p) state.projects.push(stubProject(hd, name));
+    else if (name && !p.jobName) p.jobName = name;
+  };
+  // "HD4275 - Classic Developments - 300 Peacocke" -> "Classic Developments - 300 Peacocke"
+  const jobFromSiteTitle = t => String(t || '').replace(/^\s*HD\s?\d{3,5}(-\d+)?\s*[-–:]?\s*/i, '').trim();
 
   // ---------- Settings ----------
 
@@ -187,9 +198,124 @@
       const hdsInSubject = M.extractHdNumbers(email.subject);
       if (autoOn() && hasFileLink() && hdsInSubject.length === 1) {
         fileNow(hdsInSubject[0], true);
+      } else if (hdsInSubject.length === 0 && hasSearchLink()) {
+        // No HD number: look for a clear clue (same thread or same client filed before).
+        setCard({ kind: 'looking' });
+        findClue(email, (clue, candidates) => {
+          if (token !== state.token) return;
+          (candidates || []).forEach(c => addStub(c.hd, c.job));
+          if (clue) {
+            state.selectedHd = clue.hd;
+            setCard({ kind: 'suggest', ...clue });
+          } else if (candidates && candidates.length && state.mode === 'outlook') {
+            // No clear winner: show the likely projects to pick from.
+            state.result = { ...state.result, autoSelect: null,
+              suggestions: candidates.map(c => ({ project: projectByHd(c.hd), reason: c.why })) };
+            setCard({ kind: 'choose' });
+          } else {
+            setCard({ kind: 'choose', noClue: true });
+          }
+        });
       } else {
         setCard({ kind: 'choose' });
       }
+    });
+  }
+
+  // ---------- Clues for emails without an HD number ----------
+
+  // Calls the search flow with an exact SharePoint (KQL) search. Resolves to search rows.
+  function searchExact(kql, params) {
+    return fetch(searchUrl(), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question: 'exact', kql, params: params || '' }),
+    })
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error('search ' + r.status))))
+      .then(res => rawRows(res.search));
+  }
+
+  // HD number of a search row: dash-job folder in the path first, then the site.
+  function hdFromRow(row) {
+    const path = String(row.Path || '');
+    const dash = path.match(/\/(HD\d{3,5}-\d+)\s*-[^/]*\//i);
+    if (dash) return dash[1].toUpperCase();
+    const t = String(row.SiteTitle || '').match(/^\s*HD\s?(\d{3,5})\b/i)
+      || path.match(/\/sites\/HD(\d{3,5})(?![\d-])/i);
+    return t ? 'HD' + t[1] : '';
+  }
+
+  const ownDomain = /@hdgeo\.co\.nz$/i;
+  const topicOf = subject => String(subject || '')
+    .replace(/^\s*((re|fw|fwd|aw)\s*:\s*)+/i, '')
+    .replace(/[^\w\s&]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // cb(clue or null). A clue is only given when one project clearly wins.
+  function findClue(email, cb) {
+    if (state.mode === 'preview') {
+      const r = state.result || { suggestions: [] };
+      const s = r.suggestions[0];
+      if (s && (r.autoSelect || r.suggestions.length === 1)) {
+        setTimeout(() => cb({ hd: s.project.hdNumber, job: s.project.jobName, why: s.reason }), 500);
+      } else setTimeout(() => cb(null), 500);
+      return;
+    }
+    const addresses = [email.from].concat(email.to || [], email.cc || [])
+      .filter(a => a && !ownDomain.test(a))
+      .filter((a, i, all) => all.indexOf(a) === i).slice(0, 4);
+    const topic = topicOf(email.subject);
+    const useTopic = topic.split(' ').length >= 3 || topic.length >= 15;
+    const parts = addresses.map(a => `"${a}"`);
+    if (useTopic) parts.unshift(`Title:"${topic}"`);
+    if (!parts.length) { cb(null); return; }
+
+    searchExact(`(${parts.join(' OR ')}) (FileExtension:eml OR FileExtension:msg)`)
+      .then(rows => {
+        const norm = s => topicOf(String(s || '').replace(/^\d{14}\s*-\s*/, '').replace(/_/g, ' ')).toLowerCase();
+        const now = Date.now();
+        const groups = {};
+        rows.forEach(row => {
+          const hd = hdFromRow(row);
+          if (!hd) return;
+          // Filed date from the file name (yyyyMMddHHmmss - …), else the modified date.
+          const m = String(row.Title || '').match(/^(\d{4})(\d{2})(\d{2})\d{6}/);
+          const iso = m ? `${m[1]}-${m[2]}-${m[3]}` : String(row.Write || '').slice(0, 10);
+          const days = iso ? (now - Date.parse(iso)) / 864e5 : 9999;
+          // Recent emails count most: a contact's old projects shouldn't win over the current one.
+          const weight = days <= 60 ? 5 : days <= 180 ? 2 : days <= 365 ? 0.7 : 0.3;
+          const g = groups[hd] || (groups[hd] = { hd, job: jobFromSiteTitle(row.SiteTitle), score: 0, thread: 0, client: 0, last: '' });
+          if (useTopic && norm(row.Title).includes(topic.toLowerCase())) { g.score += 3 * weight; g.thread++; } else { g.score += weight; g.client++; }
+          if (iso > g.last) g.last = iso;
+        });
+        const ranked = Object.values(groups).sort((a, b) => b.score - a.score).slice(0, 4);
+        ranked.forEach(g => {
+          g.why = [
+            g.thread ? `${g.thread} earlier email${g.thread === 1 ? '' : 's'} in this thread` : '',
+            g.client ? `${g.client} filed email${g.client === 1 ? '' : 's'} with this contact` : '',
+            g.last ? `last ${nzDate(g.last)}` : '',
+          ].filter(Boolean).join(' · ');
+        });
+        const top = ranked[0];
+        const second = ranked[1];
+        const clear = top && top.score >= 2 && (!second || top.score >= 2 * second.score);
+        cb(clear ? top : null, ranked);
+      })
+      .catch(() => cb(null, []));
+  }
+
+  // Project search by job name, address or client (site titles), for the "choose" card.
+  function searchProjects(text) {
+    const words = text.split(/\s+/).map(w => w.replace(/[^\w&-]/g, '')).filter(w => w.length >= 2).slice(0, 5);
+    if (!words.length) return Promise.resolve([]);
+    const kql = words.map(w => `SiteTitle:${w}*`).join(' AND ');
+    return searchExact(kql, '&collapsespecification=%27SPSiteURL:1%27').then(rows => {
+      const seen = {};
+      return rows.map(r => {
+        const m = String(r.SiteTitle || '').match(/^\s*HD\s?(\d{3,5})\b/i);
+        return { hd: m ? 'HD' + m[1] : '', job: jobFromSiteTitle(r.SiteTitle) };
+      })
+        .filter(p => p.hd && !seen[p.hd] && (seen[p.hd] = true))
+        .slice(0, 8);
     });
   }
 
@@ -311,9 +437,11 @@
 
   function chooserHtml(title) {
     const r = state.result || { suggestions: [] };
-    const sugg = r.suggestions.length
-      ? r.suggestions.map(s => optionHtml(s.project, s.reason)).join('')
-      : '<p class="empty">No project found in this email.</p>';
+    const listed = r.suggestions.map(s => optionHtml(s.project, s.reason));
+    const picked = state.selectedHd && !r.suggestions.some(s => s.project.hdNumber === state.selectedHd)
+      ? projectByHd(state.selectedHd) : null;
+    if (picked) listed.unshift(optionHtml(picked, 'Chosen'));
+    const sugg = listed.length ? listed.join('') : '<p class="empty">No project found in this email.</p>';
     const several = !r.autoSelect && r.suggestions.length > 1 && !state.selectedHd
       ? '<p class="empty">More than one project matches. Pick the right one.</p>' : '';
     const sel = state.selectedHd;
@@ -322,8 +450,8 @@
       ${title ? `<p class="card-title">${title}</p>` : ''}
       ${several}
       <div class="choices" id="choices">${sugg}</div>
-      <label class="label" for="pick-input">${state.mode === 'outlook' ? 'Another project: type the HD number' : 'Another project'}</label>
-      <input id="pick-input" type="search" placeholder="${state.mode === 'outlook' ? 'e.g. HD4400 or HD4156-1' : 'HD number, job name or client'}" autocomplete="off" />
+      <label class="label" for="pick-input">Another project</label>
+      <input id="pick-input" type="search" placeholder="HD number, job name, address or client" autocomplete="off" />
       <div class="choices" id="pick-results"></div>
       <button id="file-btn" class="btn-primary" type="button" ${!sel || noLink ? 'disabled' : ''}>${sel ? `File to ${esc(sel)}` : 'Choose a project'}</button>
       ${noLink ? '<p class="help">Add the filing flow link in Settings (⚙ at the top) first.</p>' : ''}`;
@@ -336,6 +464,17 @@
     switch (c.kind) {
       case 'blocked':
         html = statusHtml('muted', '–', 'Meeting invite', 'Calendar items aren\'t filed to project sites.');
+        break;
+      case 'looking':
+        html = statusHtml('', '<span class="spinner"></span>', 'Looking for the project…',
+          'No HD number in the subject. Checking this thread and contact in filed emails.');
+        break;
+      case 'suggest':
+        html = `<div class="suggest">${statusHtml('warn', '?', `File to ${esc(c.hd)}?`,
+          `${c.job ? `<strong>${esc(c.job)}</strong><br>` : ''}${esc(c.why || '')}`)}
+          <button type="button" id="yes-btn" class="btn-primary" ${hasFileLink() ? '' : 'disabled'}>Yes, file to ${esc(c.hd)}</button>
+          <button type="button" id="no-btn" class="btn-secondary">No, choose another project</button>
+          ${hasFileLink() ? '' : '<p class="help">Add the filing flow link in Settings (⚙ at the top) first.</p>'}</div>`;
         break;
       case 'filing':
         html = statusHtml('', '<span class="spinner"></span>', `Filing to ${esc(c.hd)}…`,
@@ -357,7 +496,8 @@
         const sub = !state.email ? 'Open an email to file it.'
           : hdCount > 1 ? 'This subject has more than one HD number.'
             : (state.result && state.result.suggestions.length) ? 'Check the project and click File.'
-              : 'No HD number in this email. Pick the project.';
+              : c.noClue ? 'No HD number and no clear match. Type the HD number, or search by job name, address or client.'
+                : 'No HD number in this email. Pick the project.';
         html = statusHtml('warn', '?', 'File this email?', sub) + chooserHtml('');
       }
     }
@@ -379,6 +519,10 @@
     if (other) other.addEventListener('click', () => { state.chooserOpen = true; state.selectedHd = null; renderCard(); });
     const retry = $('retry-btn');
     if (retry) retry.addEventListener('click', () => fileNow(state.card.hd, false));
+    const yes = $('yes-btn');
+    if (yes) yes.addEventListener('click', () => fileNow(state.card.hd, false));
+    const no = $('no-btn');
+    if (no) no.addEventListener('click', () => { state.selectedHd = null; setCard({ kind: 'choose' }); const p = $('pick-input'); if (p) p.focus(); });
   }
 
   function renderPickResults() {
@@ -388,21 +532,42 @@
     let options;
     if (state.mode === 'outlook') {
       const hds = M.extractHdNumbers(q.replace(/^(\d)/, 'HD$1'));
-      options = hds.map(hd => optionHtml(stubProject(hd), 'Typed HD number'));
-      if (!options.length) options = ['<p class="empty">Type the HD number, e.g. HD4400 or HD4156-1.</p>'];
+      if (hds.length) {
+        options = hds.map(hd => optionHtml(stubProject(hd), 'Typed HD number'));
+      } else if (q.length >= 3 && hasSearchLink()) {
+        // Not an HD number: search project sites by job name, address or client.
+        out.innerHTML = '<p class="empty">Searching projects…</p>';
+        clearTimeout(state.pickTimer);
+        const ask = q;
+        state.pickTimer = setTimeout(() => {
+          searchProjects(ask).then(found => {
+            const now = $('pick-input');
+            if (!now || now.value.trim().toLowerCase() !== ask) return;
+            out.innerHTML = found.length
+              ? found.map(p => optionHtml(stubProject(p.hd, p.job), '')).join('')
+              : '<p class="empty">No project sites match. Try fewer words or the HD number.</p>';
+            wirePickOptions(out);
+          }).catch(() => { out.innerHTML = '<p class="empty">Project search failed. Type the HD number instead.</p>'; });
+        }, 500);
+        return;
+      } else {
+        options = ['<p class="empty">Type the HD number (e.g. HD4400 or HD4156-1), or a job name, address or client.</p>'];
+      }
     } else {
       const matches = state.projects.filter(p =>
         [p.hdNumber, p.jobName, p.client].join(' ').toLowerCase().includes(q)).slice(0, 8);
       options = matches.length ? matches.map(p => optionHtml(p, '')) : ['<p class="empty">No projects match.</p>'];
     }
     out.innerHTML = options.join('');
+    wirePickOptions(out);
+  }
+
+  function wirePickOptions(out) {
     out.querySelectorAll('.option').forEach(btn => btn.addEventListener('click', () => {
-      addStub(btn.dataset.hd);
+      const name = (btn.querySelector('.name').textContent.split(' – ')[1] || '').trim();
+      addStub(btn.dataset.hd, name);
       state.selectedHd = btn.dataset.hd;
-      const keep = $('pick-input').value;
       renderCard();
-      const again = $('pick-input');
-      if (again) { again.value = keep; renderPickResults(); }
     }));
   }
 
@@ -423,19 +588,35 @@
 
   // Turns the SharePoint search reply (from the search flow) into simple rows.
   // File names look like "20260528084726 - Re_ HD3884 - subject": the date comes from the front.
-  function searchRows(search) {
+  function rawRows(search) {
     const table = search && search.PrimaryQueryResult && search.PrimaryQueryResult.RelevantResults
       && search.PrimaryQueryResult.RelevantResults.Table;
-    const rows = (table && table.Rows) || [];
-    return rows.map(r => {
+    return ((table && table.Rows) || []).map(r => {
       const o = {};
       (r.Cells || []).forEach(c => { o[c.Key] = c.Value; });
+      return o;
+    });
+  }
+
+  // Link that opens the file in SharePoint's viewer instead of downloading it:
+  // <site>/<library>/Forms/AllItems.aspx?id=<file>&parent=<folder>
+  function viewerUrl(path) {
+    const m = String(path || '').match(/^(https:\/\/[^/]+)((?:\/(?:sites|teams)\/[^/]+)?)\/([^/]+)\/(.+)$/i);
+    if (!m) return path;
+    const [, origin, site, lib, rest] = m;
+    const file = `${site}/${lib}/${rest}`;
+    const parent = file.replace(/\/[^/]*$/, '');
+    return `${origin}${site}/${encodeURI(lib)}/Forms/AllItems.aspx?id=${encodeURIComponent(file)}&parent=${encodeURIComponent(parent)}`;
+  }
+
+  function searchRows(search) {
+    return rawRows(search).map(o => {
       const title = String(o.Title || '');
       const m = title.match(/^(\d{4})(\d{2})(\d{2})\d{6} - (.*)$/);
       const clean = s => String(s || '').replace(/<\/?c0>/g, '').replace(/<ddd\/>/g, '…').replace(/\s+/g, ' ').trim();
       return {
         title: (m ? m[4] : title).replace(/_ /g, ': ').replace(/^RE: /i, 'RE: '),
-        url: o.Path || '',
+        url: o.Path ? viewerUrl(o.Path) : '',
         site: o.SiteTitle || '',
         date: m ? `${m[1]}-${m[2]}-${m[3]}` : (o.Write || ''),
         summary: clean(o.HitHighlightedSummary).slice(0, 220),

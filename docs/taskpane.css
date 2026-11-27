@@ -161,6 +161,14 @@ input:focus { outline: 2px solid var(--purple); outline-offset: 0; border-color:
 }
 .btn-primary:hover { background: var(--magenta); }
 .btn-primary:disabled { background: #DDD6E0; color: var(--muted); cursor: default; }
+.btn-secondary {
+  width: 100%; font: inherit; font-weight: 600; padding: 8px; border-radius: 8px; margin-top: 6px;
+  background: #fff; color: var(--purple-dark); border: 1.5px solid #CFC8D3; cursor: pointer;
+}
+.btn-secondary:hover { border-color: var(--purple); background: var(--tint); }
+.suggest .status-head { color: var(--purple-dark); }
+.suggest .status-sub strong { color: var(--ink); font-size: 13px; }
+#file-card:has(.suggest) { border: 2px solid var(--orange); box-shadow: 0 4px 16px rgba(246,147,33,.25); }
 .link-btn {
   border: 0; background: none; color: var(--purple); font: inherit; font-size: 13px; font-weight: 600;
   cursor: pointer; padding: 0; margin-top: 8px;

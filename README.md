@@ -20,6 +20,8 @@ Run a local web server on `docs` and open `taskpane.html` in a browser. Choose s
 ## Status
 - [x] Panel, matching rules and search, previewed with sample data
 - [x] Filing works without Andrew (27/11/2026): the add-in sends the open email (`getAsFileAsync`, Mailbox 1.14) to the Power Automate flow "Email filing - File email" (HDGeoAutomations). The flow finds the site in the Project Register and saves `yyyyMMddHHmmss - subject.eml` to `/Shared Documents/Emails`, or to `<HD-n> - …/01 Emails` for dash jobs. The flow link is pasted once in the panel's **Settings** and stored in the user's Outlook settings, never in this repo.
+- [x] Emails without an HD number (27/11/2026): the panel checks filed emails for the same thread or the same client contact (recent emails count most). One clear project → "File to HDxxxx?" Yes/No; otherwise likely projects are listed, or you type the HD number or search sites by job name, address or client. Uses the search flow's exact-search input (`kql`, `params`).
+- [x] Search results open in SharePoint's file viewer instead of downloading the .eml/.msg
 - [ ] HDGeoAutomations on the 382 private HD teams (Andrew, at rollout)
 - [ ] Real project list in the panel (names, clients) instead of HD numbers only
 - [ ] **Andrew (later, for rollout):** Entra app registration, if we move from the flow link to signed-in Microsoft Graph calls
